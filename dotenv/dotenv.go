@@ -1,3 +1,7 @@
+// Package dotenv parses .env files into a key/value map.
+// Lines beginning with # are treated as comments.
+// Inline comments (preceded by whitespace and #) are stripped.
+// Quoted values (single or double) have their quotes removed.
 package dotenv
 
 import (
@@ -5,22 +9,21 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"github.com/user/envlint/expander"
 )
 
-// Env holds the parsed key-value pairs from a .env file.
-type Env map[string]string
-
-// Load reads a .env file and returns its key-value pairs.
-// It skips blank lines and comments (lines starting with '#').
-// It returns an error if the file cannot be opened or contains malformed lines.
-func Load(path string) (Env, error) {
+// Load reads the .env file at path and returns a map of key/value pairs.
+// Variable references in values are expanded using the parsed map and
+// the OS environment.
+func Load(path string) (map[string]string, error) {
 	f, err := os.Open(path)
 	if err != nil {
-		return nil, fmt.Errorf("dotenv: cannot open file %q: %w", path, err)
+		return nil, fmt.Errorf("dotenv: open %q: %w", path, err)
 	}
 	defer f.Close()
 
-	env := make(Env)
+	env := make(map[string]string)
 	scanner := bufio.NewScanner(f)
 	lineNum := 0
 
@@ -28,37 +31,45 @@ func Load(path string) (Env, error) {
 		lineNum++
 		line := strings.TrimSpace(scanner.Text())
 
-		// Skip blank lines and comments
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
 
-		// Strip optional inline comment
-		if idx := strings.Index(line, " #"); idx != -1 {
-			line = strings.TrimSpace(line[:idx])
+		// Strip export prefix
+		line = strings.TrimPrefix(line, "export ")
+
+		idx := strings.IndexByte(line, '=')
+		if idx < 0 {
+			return nil, fmt.Errorf("dotenv: line %d: malformed assignment %q", lineNum, line)
 		}
 
-		parts := strings.SplitN(line, "=", 2)
-		if len(parts) != 2 {
-			return nil, fmt.Errorf("dotenv: malformed line %d in %q: %q", lineNum, path, line)
-		}
+		key := strings.TrimSpace(line[:idx])
+		val := strings.TrimSpace(line[idx+1:])
 
-		key := strings.TrimSpace(parts[0])
-		value := strings.TrimSpace(parts[1])
-
-		// Strip surrounding quotes from value
-		if len(value) >= 2 {
-			if (value[0] == '"' && value[len(value)-1] == '"') ||
-				(value[0] == '\'' && value[len(value)-1] == '\'') {
-				value = value[1 : len(value)-1]
+		// Strip inline comment (only when value is unquoted)
+		if len(val) == 0 || (val[0] != '"' && val[0] != '\'') {
+			if ci := strings.Index(val, " #"); ci >= 0 {
+				val = strings.TrimSpace(val[:ci])
 			}
 		}
 
-		env[key] = value
+		// Strip surrounding quotes
+		if len(val) >= 2 {
+			if (val[0] == '"' && val[len(val)-1] == '"') ||
+				(val[0] == '\'' && val[len(val)-1] == '\'') {
+				val = val[1 : len(val)-1]
+			}
+		}
+
+		env[key] = val
 	}
 
 	if err := scanner.Err(); err != nil {
-		return nil, fmt.Errorf("dotenv: error reading %q: %w", path, err)
+		return nil, fmt.Errorf("dotenv: scan %q: %w", path, err)
+	}
+
+	if expander.HasReference(fmt.Sprintf("%v", env)) {
+		env = expander.Expand(env)
 	}
 
 	return env, nil
