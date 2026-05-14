@@ -1,0 +1,29 @@
+# envlint schema definition
+# Define the expected environment variables for your project.
+
+vars:
+  DATABASE_URL:
+    required: true
+    type: url
+    description: "Primary database connection string"
+
+  PORT:
+    required: false
+    type: int
+    description: "HTTP server port (defaults to 8080)"
+
+  APP_ENV:
+    required: true
+    type: string
+    pattern: "^(development|staging|production)$"
+    description: "Deployment environment name"
+
+  ENABLE_METRICS:
+    required: false
+    type: bool
+    description: "Toggle Prometheus metrics endpoint"
+
+  API_BASE_URL:
+    required: true
+    type: url
+    description: "Base URL for the upstream API"
