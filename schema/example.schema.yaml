@@ -10,6 +10,8 @@ vars:
   PORT:
     required: false
     type: int
+    min: 1
+    max: 65535
     description: "HTTP server port (defaults to 8080)"
 
   APP_ENV:
@@ -27,3 +29,9 @@ vars:
     required: true
     type: url
     description: "Base URL for the upstream API"
+
+  LOG_LEVEL:
+    required: false
+    type: string
+    pattern: "^(debug|info|warn|error)$"
+    description: "Application log verbosity level (defaults to info)"
