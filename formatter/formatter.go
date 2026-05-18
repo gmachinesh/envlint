@@ -62,6 +62,13 @@ func FormatValue(value string, opts Options) string {
 	return value
 }
 
+// FormatKeyValue formats a key-value pair as a single string using the
+// provided options for both the key and the value. The result takes the
+// form "KEY=value", consistent with standard environment variable notation.
+func FormatKeyValue(key, value string, opts Options) string {
+	return fmt.Sprintf("%s=%s", FormatKey(key, opts), FormatValue(value, opts))
+}
+
 // toSnakeCase converts a string to snake_case.
 func toSnakeCase(s string) string {
 	s = strings.ReplaceAll(s, "-", "_")
